@@ -11,9 +11,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
-  const [reservation, setReservation] = useState({ guest_name: "", email: "", phone: "", check_in: "", check_out: "", guests: "2", apartment_type: "Vista al mar", notes: "" });
-  const [reservationStatus, setReservationStatus] = useState("");
-  const [reservationSaving, setReservationSaving] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -45,27 +42,6 @@ export default function Home() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, sending]);
-
-  async function submitReservation(event: FormEvent) {
-    event.preventDefault();
-    setReservationStatus("");
-    setReservationSaving(true);
-    try {
-      const response = await fetch("/api/reservations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...reservation, guests: Number(reservation.guests) }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "No se ha podido guardar la solicitud.");
-      setReservationStatus(`Solicitud guardada correctamente. Referencia: ${data.id || "registrada"}. No es una reserva confirmada.`);
-      setReservation({ guest_name: "", email: "", phone: "", check_in: "", check_out: "", guests: "2", apartment_type: "Vista al mar", notes: "" });
-    } catch (e) {
-      setReservationStatus(e instanceof Error ? e.message : "Error al guardar la solicitud.");
-    } finally {
-      setReservationSaving(false);
-    }
-  }
 
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
@@ -113,34 +89,13 @@ export default function Home() {
           <div className="wave-icon">🌊</div>
           <p className="kicker">AQUA APARTMENTS BELLAMAR</p>
           <h2>Una conversación natural, a cualquier hora.</h2>
-          <p>Haz preguntas como un huésped: consulta información o inicia una solicitud de reserva. El agente conectado responderá según su configuración actual.</p>
+          <p>Haz preguntas como un huésped: consulta información o inicia tu solicitud de reserva directamente en la conversación con el agente.</p>
           <div className="feature-list">
             <div><span>✓</span><p>Respuestas del agente real de Voiceflow</p></div>
             <div><span>✓</span><p>Interfaz propia estilo WhatsApp</p></div>
             <div><span>✓</span><p>Preparado para ampliar el flujo de reservas</p></div>
           </div>
-          <div className="notice"><span>ⓘ</span><p>Esta demo permite enviar solicitudes de estancia para que el equipo las revise. No consulta disponibilidad ni confirma reservas.</p></div>
-          <div className="reservation-card">
-            <h3>Solicitar una estancia</h3>
-            <p>Prueba el formulario: la solicitud se guardará para que AQUA pueda verla en Supabase cuando esté configurado.</p>
-            <form className="reservation-form" onSubmit={submitReservation}>
-              <label>Nombre completo<input required maxLength={120} value={reservation.guest_name} onChange={(e) => setReservation({ ...reservation, guest_name: e.target.value })} placeholder="Tu nombre" /></label>
-              <label>Correo electrónico<input required type="email" maxLength={254} value={reservation.email} onChange={(e) => setReservation({ ...reservation, email: e.target.value })} placeholder="nombre@correo.com" /></label>
-              <label>Teléfono (opcional)<input type="tel" value={reservation.phone} onChange={(e) => setReservation({ ...reservation, phone: e.target.value })} placeholder="+34…" /></label>
-              <div className="reservation-grid">
-                <label>Entrada<input required type="date" min={new Date().toISOString().slice(0, 10)} value={reservation.check_in} onChange={(e) => setReservation({ ...reservation, check_in: e.target.value, check_out: reservation.check_out && reservation.check_out <= e.target.value ? "" : reservation.check_out })} /></label>
-                <label>Salida<input required type="date" min={reservation.check_in || new Date().toISOString().slice(0, 10)} value={reservation.check_out} onChange={(e) => setReservation({ ...reservation, check_out: e.target.value })} /></label>
-              </div>
-              <div className="reservation-grid">
-                <label>Huéspedes<select value={reservation.guests} onChange={(e) => setReservation({ ...reservation, guests: e.target.value })}>{[1,2,3,4,5,6,7,8].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
-                <label>Tipo de apartamento<select value={reservation.apartment_type} onChange={(e) => setReservation({ ...reservation, apartment_type: e.target.value })}><option>Vista al mar</option><option>Premium vista al mar</option><option>Con terraza</option><option>No lo sé todavía</option></select></label>
-              </div>
-              <label>Comentarios (opcional)<textarea rows={3} maxLength={2000} value={reservation.notes} onChange={(e) => setReservation({ ...reservation, notes: e.target.value })} placeholder="Preferencias o preguntas" /></label>
-              <button type="submit" disabled={reservationSaving}>{reservationSaving ? "Guardando…" : "Guardar solicitud de reserva"}</button>
-              {reservationStatus && <p className="reservation-status" role="status">{reservationStatus}</p>}
-              <small>Datos de demostración. No se confirmará ninguna reserva ni disponibilidad. No uses datos reales hasta que AQUA autorice esta demo y se configure su aviso de privacidad.</small>
-            </form>
-          </div>
+          <div className="notice"><span>ⓘ</span><p>Las solicitudes de reserva se gestionan desde la conversación con el agente. La demo no consulta disponibilidad ni confirma reservas.</p></div>
         </aside>
 
         <div className="chat-column">
