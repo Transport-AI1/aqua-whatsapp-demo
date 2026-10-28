@@ -64,14 +64,14 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         action: action === "launch"
           ? { type: "launch" }
-          : { type: "text", payload: { message: String(body.text || "").slice(0, 2000) } },
+          : { type: "text", payload: String(body.text || "").slice(0, 2000) },
         config: { userTimezone: "Europe/Madrid" },
       }),
       cache: "no-store",
     });
     const interactData = await interactResponse.json();
     if (!interactResponse.ok) {
-      console.error("Voiceflow interact failed:", interactResponse.status, interactData);
+      console.error("Voiceflow interact failed:", interactResponse.status, JSON.stringify(interactData));
       return NextResponse.json({ error: "Voiceflow no ha podido procesar el mensaje. Inténtalo de nuevo." }, { status: 502 });
     }
 
