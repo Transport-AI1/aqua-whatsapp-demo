@@ -15,73 +15,96 @@ function clock() {
 }
 
 function getReply(text: string, stage: string) {
-  const value = text.toLowerCase();
+  const value = text.toLowerCase().trim();
+  const has = (...terms: string[]) => terms.some((term) => value.includes(term));
 
-  if (value.includes("reiniciar") || value.includes("empezar de nuevo")) {
+  // Siempre priorizar una nueva intención antes de continuar el flujo de reserva.
+  if (has("reiniciar", "empezar de nuevo", "cancelar")) {
     return {
-      reply: "¡Por supuesto! 🌊 ¿En qué puedo ayudarle? Puede consultar información general o preparar una solicitud de reserva.",
+      reply: "Por supuesto, dejamos la solicitud anterior. 🌊 ¿Qué desea consultar ahora: información de los apartamentos o preparar una reserva?",
       stage: "start",
     };
   }
 
-  if (stage === "need-guests") {
+  if (has("información", "informacion", "dame información", "dame informacion", "qué apartamentos", "que apartamentos", "apartamentos")) {
     return {
-      reply: "Perfecto. ¿Qué fechas de entrada y salida tiene previstas? Puede indicármelas, por ejemplo, del 15 al 18 de noviembre.",
+      reply: "¡Claro! 🌊 Puedo ayudarle a preparar una estancia en AQUA Apartments Bellamar. Para darle datos exactos sobre equipamiento, capacidad, servicios y características de cada apartamento, hay que utilizar la información oficial de AQUA; no quiero inventarle detalles. ¿Busca algún tipo de apartamento en particular o quiere preparar una reserva?",
+      stage: "start",
+    };
+  }
+
+  if (has("precio", "precios", "tarifa", "tarifas", "cuánto cuesta", "cuanto cuesta", "disponibilidad", "disponible")) {
+    return {
+      reply: "Las tarifas y la disponibilidad dependen de las fechas y del apartamento. Esta demo todavía utiliza datos de prueba y no está conectada al sistema de reservas de AQUA, así que no puedo confirmar un precio ni disponibilidad reales. Si quiere, podemos hacer una reserva ficticia para enseñarle cómo funcionaría.",
+      stage: "start",
+    };
+  }
+
+  if (has("mar", "vistas", "terraza", "habitaciones", "piscina", "parking", "aparcamiento", "mascota", "mascotas", "wifi", "wi-fi")) {
+    return {
+      reply: "Puedo ayudarle a encontrar una opción que encaje con sus preferencias. Para confirmar si un apartamento concreto tiene esa característica, tendremos que contrastarlo con la ficha oficial de AQUA. ¿Quiere que preparemos una solicitud de reserva de prueba?",
+      stage: "start",
+    };
+  }
+
+  if (has("reserva", "reservar", "solicitud", "alojarme", "alojamiento")) {
+    return {
+      reply: "¡Con mucho gusto! Vamos a preparar una reserva de demostración. 🌊 ¿Para cuántas personas sería la estancia? (Por ejemplo: 2 adultos y 1 niño).",
+      stage: "need-guests",
+    };
+  }
+
+  if (stage === "need-guests") {
+    if (!/\\d/.test(value) && !has("adulto", "adultos", "persona", "personas", "niño", "niños", "nino", "ninos", "pareja", "familia")) {
+      return { reply: "Para registrar la solicitud, necesito el número de huéspedes. Por ejemplo: «2 adultos».", stage };
+    }
+    return {
+      reply: "Perfecto. ¿Qué fecha de entrada y qué fecha de salida desea? Por ejemplo, del 15 al 18 de noviembre de 2026.",
       stage: "need-dates",
     };
   }
 
   if (stage === "need-dates") {
+    if (!/\\d/.test(value) && !has("mañana", "manana", "fin de semana", "noviembre", "diciembre", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre")) {
+      return { reply: "No he identificado las fechas todavía. Indíqueme la entrada y la salida, por ejemplo: «del 15 al 18 de noviembre».", stage };
+    }
     return {
-      reply: "Gracias. ¿Qué características son más importantes para usted: vistas al mar, terraza, número de habitaciones u otra preferencia?",
+      reply: "Gracias. ¿Qué prefiere para su estancia: vistas al mar, terraza, más habitaciones u otra característica? Lo anotaremos como preferencia, pendiente de comprobar.",
       stage: "need-preference",
     };
   }
 
   if (stage === "need-preference") {
     return {
-      reply: "Anotado. Para completar la solicitud de demostración, ¿qué nombre debemos poner y qué teléfono o correo de contacto prefiere facilitar? Utilice datos ficticios en esta demo.",
+      reply: "Anotado. Para completar la reserva ficticia, ¿qué nombre de prueba ponemos y qué teléfono o correo ficticio usamos? No introduzca datos personales reales en esta demostración.",
       stage: "need-contact",
     };
   }
 
   if (stage === "need-contact") {
+    const looksLikeContact = value.includes("@") || /\\d{6,}/.test(value) || value.split(/\\s+/).length >= 2;
+    if (!looksLikeContact) {
+      return { reply: "Necesito un nombre de prueba y un contacto ficticio (correo o teléfono) para completar el ejemplo. No utilice sus datos reales.", stage };
+    }
     return {
-      reply: "Gracias. Aquí tiene el resumen de la solicitud de ejemplo. El equipo de AQUA tendría que verificar la disponibilidad, las características y las tarifas antes de confirmar nada.\n\nEsta demo no envía datos a AQUA ni registra reservas reales. Puede escribir «reiniciar» para empezar otra vez.",
+      reply: "Perfecto. Ya tenemos los datos de la solicitud de demostración. Antes de guardarla, el siguiente paso sería mostrarle un resumen con huéspedes, fechas, preferencias y contacto para que confirme. Esta demo usa datos ficticios: no consulta disponibilidad real ni confirma una reserva en AQUA.",
       stage: "summary",
     };
   }
 
-  if (value.includes("reserva") || value.includes("reservar") || value.includes("solicitud")) {
+  if (has("hola", "buenas", "buenos días", "buenas tardes")) {
     return {
-      reply: "Con mucho gusto. Para preparar una solicitud, primero necesito saber para cuántas personas sería la estancia.",
-      stage: "need-guests",
-    };
-  }
-
-  if (value.includes("mar") || value.includes("terraza") || value.includes("apartamento") || value.includes("alojamiento")) {
-    return {
-      reply: "¡Estaré encantado de orientarle! 🌊 Para no darle información incorrecta, las características concretas y la disponibilidad deben verificarse con el equipo de AQUA. Si lo desea, podemos preparar una solicitud con sus preferencias y fechas.",
+      reply: "¡Hola! 👋 Bienvenido/a a AQUA Apartments Bellamar. Puedo orientarle sobre los apartamentos o ayudarle a preparar una reserva de demostración. ¿Qué necesita?",
       stage: "start",
     };
   }
 
-  if (value.includes("precio") || value.includes("disponibilidad") || value.includes("disponible") || value.includes("cuánto cuesta")) {
-    return {
-      reply: "Las tarifas y la disponibilidad deben comprobarse en el sistema de reservas de AQUA. Esta demostración no está conectada a ese sistema, así que no puedo confirmar precios ni disponibilidad reales. ¿Quiere preparar una solicitud para que el equipo la revise?",
-      stage: "start",
-    };
-  }
-
-  if (value.includes("hola") || value.includes("buenas") || value.includes("hello")) {
-    return {
-      reply: "¡Hola! 👋 Bienvenido/a a AQUA Apartments Bellamar. Puedo ayudarle con información general o guiarle para preparar una solicitud de reserva. ¿Qué necesita?",
-      stage: "start",
-    };
+  if (has("gracias")) {
+    return { reply: "¡Gracias a usted! 😊 ¿Le ayudo con alguna otra consulta o quiere preparar una reserva de demostración?", stage: "start" };
   }
 
   return {
-    reply: "Gracias por su mensaje. Puedo orientarle sobre los apartamentos o ayudarle a preparar una solicitud de reserva. Tenga en cuenta que esta es una demo: no consulta disponibilidad, tarifas ni reservas reales.",
+    reply: "Entiendo. Puedo ayudarle con información general, preferencias de alojamiento o una reserva de demostración. Si me dice qué necesita, le guío paso a paso. La disponibilidad y los precios reales todavía no están conectados.",
     stage: "start",
   };
 }
