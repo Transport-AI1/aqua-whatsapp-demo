@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const PROJECT_ID = "6ae1e2332e2bb7bb800781b7";
+const PROJECT_ID = "6ae235a652d497d4392a4e2e";
 const ENVIRONMENT_ID = process.env.VOICEFLOW_ENVIRONMENT_ID || "main";
 const BASE_URL = "https://general-runtime.voiceflow.com";
 
