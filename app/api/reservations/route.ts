@@ -8,7 +8,7 @@ export async function POST(request: Request) {
 
   if (!supabaseUrl || !serviceKey) {
     return NextResponse.json(
-      { error: "El formulario todavía no está conectado a Supabase. Configura SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en Vercel." },
+      { error: "La conexión con Supabase no está configurada en el servidor." },
       { status: 503 }
     );
   }
@@ -16,15 +16,15 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const guest_name = String(body.guest_name || "").trim().slice(0, 120);
-    const email = String(body.email || "").trim().slice(0, 254);
-    const phone = String(body.phone || "").trim().slice(0, 40);
+    const guest_email = String(body.guest_email || body.email || "").trim().slice(0, 254);
+    const guest_phone = String(body.guest_phone || body.phone || "").trim().slice(0, 40);
     const check_in = String(body.check_in || "");
     const check_out = String(body.check_out || "");
     const guests = Number(body.guests);
     const apartment_type = String(body.apartment_type || "").trim().slice(0, 100);
     const notes = String(body.notes || "").trim().slice(0, 2000);
 
-    if (!guest_name || !email || !/^\S+@\S+\.\S+$/.test(email)) {
+    if (!guest_name || !guest_email || !/^\S+@\S+\.\S+$/.test(guest_email)) {
       return NextResponse.json({ error: "Indica tu nombre y un correo electrónico válido." }, { status: 400 });
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(check_in) || !/^\d{4}-\d{2}-\d{2}$/.test(check_out) || check_out <= check_in) {
@@ -42,7 +42,16 @@ export async function POST(request: Request) {
         "Content-Type": "application/json",
         Prefer: "return=representation",
       },
-      body: JSON.stringify([{ guest_name, email, phone: phone || null, check_in, check_out, guests, apartment_type: apartment_type || null, notes: notes || null }]),
+      body: JSON.stringify([{
+        guest_name,
+        guest_email,
+        guest_phone: guest_phone || null,
+        check_in,
+        check_out,
+        guests,
+        apartment_type: apartment_type || null,
+        notes: notes || null,
+      }]),
       cache: "no-store",
     });
 
