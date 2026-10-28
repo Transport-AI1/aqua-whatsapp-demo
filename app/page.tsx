@@ -1,65 +1,73 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
-declare global {
-  interface Window {
-    voiceflow?: {
-      chat?: {
-        load: (config: Record<string, unknown>) => void;
-        destroy?: () => void;
-      };
-    };
-  }
-}
+type ChatMessage = { id: string; role: "assistant" | "user"; text: string };
 
 export default function Home() {
-  const targetRef = useRef<HTMLDivElement>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sessionKey, setSessionKey] = useState("");
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    let initialized = false;
-    const scriptId = "voiceflow-widget-script";
-
-    const initialize = () => {
-      if (cancelled || initialized || !targetRef.current || !window.voiceflow?.chat) return;
-      initialized = true;
+    let active = true;
+    async function start() {
       try {
-        window.voiceflow.chat.load({
-          verify: { projectID: "6ae1e2332e2bb7bb800781b7" },
-          url: "https://general-runtime.voiceflow.com",
-          voice: { url: "https://runtime-api.voiceflow.com" },
-          render: { mode: "embedded", target: targetRef.current },
-          assistant: { title: "AQUA Apartments Bellamar", color: "#075e54" },
+        const response = await fetch("/api/voiceflow", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "launch" }),
         });
-        setStatus("ready");
-      } catch {
-        setStatus("error");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "No se ha podido conectar con el agente.");
+        if (!active) return;
+        setSessionKey(data.sessionKey);
+        setMessages((data.messages || []).map((text: string, i: number) => ({
+          id: `welcome-${i}-${Date.now()}`, role: "assistant", text,
+        })));
+      } catch (e) {
+        if (active) setError(e instanceof Error ? e.message : "Error al conectar con Voiceflow.");
+      } finally {
+        if (active) setLoading(false);
       }
-    };
-
-    const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
-    if (window.voiceflow?.chat) {
-      initialize();
-    } else if (existing) {
-      existing.addEventListener("load", initialize, { once: true });
-      existing.addEventListener("error", () => setStatus("error"), { once: true });
-    } else {
-      const script = document.createElement("script");
-      script.id = scriptId;
-      script.src = "https://cdn.voiceflow.com/widget-next/bundle.mjs";
-      script.type = "text/javascript";
-      script.onload = initialize;
-      script.onerror = () => setStatus("error");
-      document.head.appendChild(script);
     }
-
-    return () => {
-      cancelled = true;
-      try { window.voiceflow?.chat?.destroy?.(); } catch { /* Widget may not have mounted. */ }
-    };
+    start();
+    return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, sending]);
+
+  async function sendMessage(event: FormEvent) {
+    event.preventDefault();
+    const text = input.trim();
+    if (!text || !sessionKey || sending) return;
+    setInput("");
+    setError("");
+    setMessages((current) => [...current, { id: `user-${Date.now()}`, role: "user", text }]);
+    setSending(true);
+    try {
+      const response = await fetch("/api/voiceflow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "text", sessionKey, text }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se ha podido obtener una respuesta.");
+      setMessages((current) => [...current, ...(data.messages || []).map((reply: string, i: number) => ({
+        id: `assistant-${Date.now()}-${i}`, role: "assistant" as const, text: reply,
+      }))]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ha ocurrido un error.");
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
     <main className="app-shell">
@@ -73,7 +81,7 @@ export default function Home() {
       <section className="intro">
         <p className="eyebrow">EXPERIENCIA DE ATENCIÓN AL HUÉSPED</p>
         <h1>Así podría atender AQUA a sus huéspedes.</h1>
-        <p>Habla directamente con el agente de IA de la demo. Esta interfaz reproduce una conversación estilo WhatsApp, pero las respuestas las genera el agente real de Voiceflow.</p>
+        <p>Habla directamente con el agente de IA de la demo. Las respuestas las genera el agente real de Voiceflow, dentro de una interfaz de conversación propia.</p>
       </section>
 
       <section className="workspace">
@@ -83,8 +91,8 @@ export default function Home() {
           <h2>Una conversación natural, a cualquier hora.</h2>
           <p>Haz preguntas como un huésped: consulta información o inicia una solicitud de reserva. El agente conectado responderá según su configuración actual.</p>
           <div className="feature-list">
-            <div><span>✓</span><p>Conversación con el agente existente</p></div>
-            <div><span>✓</span><p>Interfaz tipo WhatsApp sin botón flotante</p></div>
+            <div><span>✓</span><p>Respuestas del agente real de Voiceflow</p></div>
+            <div><span>✓</span><p>Interfaz propia estilo WhatsApp</p></div>
             <div><span>✓</span><p>Preparado para ampliar el flujo de reservas</p></div>
           </div>
           <div className="notice"><span>ⓘ</span><p>Demostración web: no es la aplicación oficial de WhatsApp. No confirma reservas ni consulta disponibilidad real salvo que esos sistemas estén conectados al agente.</p></div>
@@ -97,24 +105,33 @@ export default function Home() {
               <div className="back-arrow">‹</div><div className="avatar">🌊</div>
               <div className="contact-info">
                 <strong>AQUA Apartments Bellamar</strong>
-                <span>{status === "ready" ? "Asistente virtual" : status === "error" ? "No se ha podido cargar" : "Conectando con el asistente…"}</span>
+                <span>{loading ? "Conectando con el asistente…" : error && !sessionKey ? "No se ha podido conectar" : "Asistente virtual"}</span>
               </div>
               <div className="header-actions" aria-hidden="true"><span>⌕</span><span>⋮</span></div>
             </div>
-            <div className="chat-canvas">
+            <div className="chat-canvas" ref={scrollRef}>
               <div className="date-chip">HOY</div>
               <div className="demo-notice">Conversación de demostración · No introduzcas datos personales reales</div>
-              <div className="voiceflow-mount" ref={targetRef} aria-label="Conversación con el agente de IA de AQUA">
-                {status === "loading" && <div className="loading-state"><span className="spinner" />Conectando con el agente de AQUA…</div>}
-                {status === "error" && <div className="error-state">No se ha podido cargar el agente. Recarga la página para intentarlo de nuevo.</div>}
-              </div>
+              {loading && <div className="loading-state"><span className="spinner" />Conectando con el agente de AQUA…</div>}
+              {!loading && messages.length === 0 && !error && <div className="empty-chat">Escribe un mensaje para empezar la conversación.</div>}
+              {messages.map((message) => (
+                <div key={message.id} className={`message-row ${message.role === "user" ? "from-user" : "from-assistant"}`}>
+                  <div className="message-bubble">{message.text}<span className="message-time">{new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}{message.role === "user" ? " ✓✓" : ""}</span></div>
+                </div>
+              ))}
+              {sending && <div className="message-row from-assistant"><div className="message-bubble typing"><span></span><span></span><span></span></div></div>}
+              {error && <div className="error-state">{error}</div>}
             </div>
+            <form className="composer" onSubmit={sendMessage}>
+              <span className="composer-plus" aria-hidden="true">＋</span>
+              <input aria-label="Escribe tu mensaje" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Escribe un mensaje" disabled={!sessionKey || loading || sending} />
+              <button type="submit" aria-label="Enviar mensaje" disabled={!input.trim() || !sessionKey || sending}>➤</button>
+            </form>
             <div className="chat-footer"><span>🔒</span> Demo web conectada al agente de IA</div>
           </div>
           <p className="under-chat">El agente responde con la configuración y la base de conocimiento publicadas en Voiceflow.</p>
         </div>
       </section>
-
       <footer className="footer"><span>Una propuesta de <strong>Transport AI</strong></span><span>Prototipo demostrativo · Sin reservas reales</span></footer>
     </main>
   );
